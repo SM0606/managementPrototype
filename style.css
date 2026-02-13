@@ -1,0 +1,582 @@
+/* Basic page styling */
+* {
+  box-sizing: border-box;
+}
+
+body {
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  margin: 0;
+  padding: 1.5rem 1rem;
+  background: linear-gradient(135deg, #f5f7fb, #e3f2fd);
+  color: #222;
+  transition: background 0.2s ease, color 0.2s ease;
+}
+
+h1 {
+  text-align: center;
+  margin-bottom: 1.5rem;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+}
+
+/* Main container card */
+.container {
+  max-width: 1100px;
+  margin: 0 auto;
+  background: #ffffff;
+  padding: 1.5rem 1.75rem 2rem;
+  border-radius: 16px;
+  box-shadow: 0 16px 40px rgba(15, 23, 42, 0.12);
+  transition: background 0.2s ease, box-shadow 0.2s ease;
+}
+
+/* DASHBOARD */
+.dashboard {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 0.75rem;
+  margin-bottom: 1.2rem;
+}
+
+.dashboard-card {
+  background: #f9fbff;
+  border-radius: 14px;
+  padding: 0.6rem 0.9rem;
+  border: 1px solid #dde5f2;
+  box-shadow: 0 4px 10px rgba(15, 23, 42, 0.04);
+}
+
+.dash-label {
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  opacity: 0.75;
+  margin-bottom: 0.3rem;
+}
+
+.dash-value {
+  font-size: 1.25rem;
+  font-weight: 600;
+}
+
+/* Form layout */
+form {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  gap: 0.9rem 1.2rem;
+  margin-bottom: 1.5rem;
+  align-items: flex-end;
+}
+
+label {
+  display: flex;
+  flex-direction: column;
+  font-size: 0.9rem;
+  gap: 0.3rem;
+}
+
+.full-width {
+  grid-column: 1 / -1;
+}
+
+input,
+textarea,
+select {
+  padding: 0.5rem 0.6rem;
+  font-size: 0.95rem;
+  border-radius: 8px;
+  border: 1px solid #d0d7e2;
+  background: #f9fbff;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease, background 0.15s ease, color 0.15s ease;
+}
+
+input:focus,
+textarea:focus,
+select:focus {
+  outline: none;
+  border-color: #1976d2;
+  background: #ffffff;
+  box-shadow: 0 0 0 2px rgba(25, 118, 210, 0.15);
+}
+
+textarea {
+  min-height: 70px;
+  resize: vertical;
+}
+
+/* Buttons */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.3rem;
+  padding: 0.5rem 0.85rem;
+  font-size: 0.9rem;
+  border-radius: 9999px;
+  border: none;
+  cursor: pointer;
+  font-weight: 500;
+  transition: transform 0.1s ease, box-shadow 0.1s ease, background-color 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+  user-select: none;
+  white-space: nowrap;
+}
+
+.btn:active {
+  transform: translateY(1px) scale(0.99);
+  box-shadow: none;
+}
+
+/* Primary button (Add / Save) */
+.btn-primary {
+  background: #1976d2;
+  color: #ffffff;
+  box-shadow: 0 8px 18px rgba(25, 118, 210, 0.35);
+}
+
+.btn-primary:hover {
+  background: #1155aa;
+}
+
+/* When editing, highlight the button differently */
+.btn-editing {
+  background: #f9a825;
+  box-shadow: 0 8px 18px rgba(251, 192, 45, 0.45);
+}
+
+/* Danger button for clear all */
+.btn-danger {
+  background: #d32f2f;
+  color: #ffffff;
+}
+
+.btn-danger:hover {
+  background: #b71c1c;
+}
+
+/* Outline buttons */
+.btn-outline {
+  background: #ffffff;
+  color: #1976d2;
+  border: 1px solid #1976d2;
+  box-shadow: 0 2px 6px rgba(25, 118, 210, 0.15);
+}
+
+.btn-outline:hover {
+  background: #e3f2fd;
+}
+
+.btn-danger-outline {
+  background: #ffffff;
+  color: #d32f2f;
+  border: 1px solid #d32f2f;
+  box-shadow: 0 2px 6px rgba(211, 47, 47, 0.15);
+}
+
+.btn-danger-outline:hover {
+  background: #ffebee;
+}
+
+.btn-small {
+  font-size: 0.8rem;
+  padding: 0.3rem 0.6rem;
+}
+
+/* Actions above table */
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-bottom: 0.8rem;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.actions input[type="text"] {
+  flex: 1 1 220px;
+}
+
+.sort-controls {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.85rem;
+}
+
+.sort-label {
+  opacity: 0.8;
+}
+
+.right-actions {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+/* Legend for row colours */
+.legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  font-size: 0.78rem;
+  margin-bottom: 0.6rem;
+  opacity: 0.9;
+}
+
+.legend-item {
+  padding: 0.25rem 0.5rem;
+  border-radius: 999px;
+  border: 1px solid transparent;
+}
+
+.legend-item.recent {
+  background: #e3f2fd;         /* light blue */
+  border-color: #64b5f6;
+}
+
+.legend-item.high {
+  background: #fff3e0;
+  border-color: #ffb74d;
+}
+
+.legend-item.old {
+  background: #eceff1;
+  border-color: #b0bec5;
+}
+
+.legend-item.done {
+  background: #e3f9e5;
+  border-color: #81c784;
+}
+
+/* Table styling */
+.table-wrapper {
+  width: 100%;
+  overflow-x: auto;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+  border-radius: 12px;
+  overflow: hidden;
+  background: #ffffff;
+  transition: background 0.2s ease;
+}
+
+thead {
+  background: #e3f2fd;
+}
+
+th,
+td {
+  border-bottom: 1px solid #e0e6f0;
+  padding: 0.5rem 0.7rem;
+  text-align: left;
+}
+
+th {
+  font-weight: 600;
+  color: #374151;
+}
+
+tbody tr:nth-child(even) {
+  background-color: #f8fafc;
+}
+
+tbody tr:hover {
+  background-color: #edf2ff;
+}
+
+.actions-cell {
+  white-space: nowrap;
+  display: flex;
+  gap: 0.25rem;
+}
+
+/* Row colour-coding */
+tbody tr.row-recent {
+  background-color: #e3f2fd;          /* light blue for recent */
+  border-left: 4px solid #42a5f5;
+}
+
+tbody tr.row-high-value {
+  background-color: #fff7e6;
+  border-left: 4px solid #ffa726;
+}
+
+tbody tr.row-old {
+  background-color: #f2f4f7;
+  border-left: 4px solid #90a4ae;
+  opacity: 0.9;
+}
+
+/* completed = green */
+tbody tr.row-completed {
+  background-color: #e3f9e5;
+  border-left: 4px solid #66bb6a;
+}
+
+/* Make sure hover still feels okay even with row classes */
+tbody tr.row-recent:hover {
+  background-color: #d4e7fb;
+}
+
+tbody tr.row-high-value:hover {
+  background-color: #ffeac5;
+}
+
+tbody tr.row-old:hover {
+  background-color: #e4e7ec;
+}
+
+tbody tr.row-completed:hover {
+  background-color: #d7f2dc;
+}
+
+/* Small screens */
+@media (max-width: 700px) {
+  body {
+    padding: 1rem 0.5rem;
+  }
+
+  .container {
+    padding: 1.2rem 1.1rem 1.5rem;
+    border-radius: 12px;
+  }
+
+  th,
+  td {
+    font-size: 0.8rem;
+  }
+
+  .actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .right-actions {
+    justify-content: flex-start;
+  }
+
+  .actions-cell {
+    flex-direction: column;
+  }
+}
+
+/* ========================= */
+/* Dark mode                 */
+/* ========================= */
+
+body.dark-mode {
+  background: radial-gradient(circle at top, #1f2933, #020617);
+  color: #e5e7eb;
+}
+
+body.dark-mode .container {
+  background: #020617;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.7);
+}
+
+/* Dashboard dark mode */
+body.dark-mode .dashboard-card {
+  background: #020617;
+  border-color: #111827;
+  box-shadow: 0 6px 14px rgba(0, 0, 0, 0.7);
+}
+
+body.dark-mode .dash-label {
+  opacity: 0.8;
+}
+
+body.dark-mode .dash-value {
+  color: #e5e7eb;
+}
+
+body.dark-mode input,
+body.dark-mode textarea,
+body.dark-mode select {
+  background: #020617;
+  border-color: #4b5563;
+  color: #e5e7eb;
+}
+
+body.dark-mode input:focus,
+body.dark-mode textarea:focus,
+body.dark-mode select:focus {
+  background: #020617;
+  border-color: #60a5fa;
+  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.4);
+}
+
+body.dark-mode table {
+  background: #020617;
+}
+
+body.dark-mode thead {
+  background: #0f172a;
+}
+
+body.dark-mode th,
+body.dark-mode td {
+  border-bottom-color: #111827;
+}
+
+/* Buttons in dark mode */
+body.dark-mode .btn-primary {
+  background: #2563eb;
+  box-shadow: 0 8px 18px rgba(37, 99, 235, 0.4);
+}
+
+body.dark-mode .btn-primary:hover {
+  background: #1d4ed8;
+}
+
+body.dark-mode .btn-outline {
+  background: transparent;
+  color: #93c5fd;
+  border-color: #60a5fa;
+  box-shadow: 0 2px 6px rgba(37, 99, 235, 0.3);
+}
+
+body.dark-mode .btn-outline:hover {
+  background: #0b1220;
+}
+
+body.dark-mode .btn-danger {
+  background: #b91c1c;
+}
+
+body.dark-mode .btn-danger:hover {
+  background: #991b1b;
+}
+
+body.dark-mode .btn-danger-outline {
+  background: transparent;
+  color: #fecaca;
+  border-color: #f87171;
+  box-shadow: 0 2px 6px rgba(220, 38, 38, 0.35);
+}
+
+body.dark-mode .btn-danger-outline:hover {
+  background: #111827;
+}
+
+/* Legend dark mode */
+body.dark-mode .legend-item.recent {
+  background: rgba(59, 130, 246, 0.18);
+  border-color: rgba(96, 165, 250, 0.8);
+}
+
+body.dark-mode .legend-item.high {
+  background: rgba(245, 158, 11, 0.2);
+  border-color: rgba(251, 191, 36, 0.8);
+}
+
+body.dark-mode .legend-item.old {
+  background: rgba(148, 163, 184, 0.2);
+  border-color: rgba(148, 163, 184, 0.9);
+}
+
+body.dark-mode .legend-item.done {
+  background: rgba(22, 163, 74, 0.22);
+  border-color: rgba(34, 197, 94, 0.9);
+}
+
+/* Dark mode for coloured rows */
+body.dark-mode tbody tr.row-recent {
+  background-color: rgba(59, 130, 246, 0.18);
+  border-left-color: #60a5fa;
+}
+
+body.dark-mode tbody tr.row-high-value {
+  background-color: rgba(245, 158, 11, 0.18);
+  border-left-color: #facc15;
+}
+
+body.dark-mode tbody tr.row-old {
+  background-color: rgba(148, 163, 184, 0.18);
+  border-left-color: #94a3b8;
+}
+
+body.dark-mode tbody tr.row-completed {
+  background-color: rgba(22, 163, 74, 0.22);
+  border-left-color: #22c55e;
+}
+
+body.dark-mode tbody tr:hover {
+  background-color: #020617;
+}
+
+body.dark-mode tbody tr.row-recent:hover {
+  background-color: rgba(59, 130, 246, 0.3);
+}
+
+body.dark-mode tbody tr.row-high-value:hover {
+  background-color: rgba(245, 158, 11, 0.3);
+}
+
+body.dark-mode tbody tr.row-old:hover {
+  background-color: rgba(148, 163, 184, 0.3);
+}
+
+body.dark-mode tbody tr.row-completed:hover {
+  background-color: rgba(22, 163, 74, 0.35);
+}
+/* =========================
+   Update Available Banner
+   ========================= */
+
+.update-banner {
+  position: fixed;
+  left: 12px;
+  right: 12px;
+  bottom: 12px;
+  z-index: 9999;
+  display: none; /* shown by JS when update is ready */
+}
+
+.update-banner__inner {
+  max-width: 1100px;
+  margin: 0 auto;
+  border-radius: 14px;
+  padding: 12px 14px;
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  justify-content: space-between;
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.35);
+
+  /* Light mode look */
+  background: #111827;
+  color: #ffffff;
+}
+
+.update-banner__text {
+  font-size: 14px;
+}
+
+.update-banner__actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+/* Dark mode (still readable, slightly different background) */
+body.dark-mode .update-banner__inner {
+  background: #0b1220;
+  color: #e5e7eb;
+}
+
+/* Small screens */
+@media (max-width: 600px) {
+  .update-banner__inner {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .update-banner__actions {
+    width: 100%;
+    justify-content: flex-end;
+  }
+}

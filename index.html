@@ -1,0 +1,617 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Nixer Management</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <!-- PWA -->
+  <link rel="manifest" href="manifest.json?v=v2" />
+  <meta name="theme-color" content="#1976d2" />
+
+  <link rel="stylesheet" href="style.css?v=v2" />
+</head>
+<body>
+  <h1>Nixer Management</h1>
+
+  <div class="container">
+    <!-- DASHBOARD SUMMARY -->
+    <div class="dashboard">
+      <div class="dashboard-card">
+        <div class="dash-label">Total jobs</div>
+        <div class="dash-value" id="totalJobs">0</div>
+      </div>
+      <div class="dashboard-card">
+        <div class="dash-label">Total profit (€)</div>
+        <div class="dash-value" id="totalProfit">0.00</div>
+      </div>
+      <div class="dashboard-card">
+        <div class="dash-label">Jobs this month</div>
+        <div class="dash-value" id="jobsThisMonth">0</div>
+      </div>
+      <div class="dashboard-card">
+        <div class="dash-label">Pending / In progress</div>
+        <div class="dash-value" id="pendingJobs">0</div>
+      </div>
+    </div>
+
+    <!-- FORM -->
+    <form id="mixerForm">
+      <label>
+        Client Name
+        <input type="text" id="clientName" required />
+      </label>
+
+      <label>
+        Contact (phone/email)
+        <input type="text" id="contact" />
+      </label>
+
+      <label>
+        Nixer Model
+        <input type="text" id="mixerModel" />
+      </label>
+
+      <label>
+        Reg / Plate
+        <input type="text" id="reg" />
+      </label>
+
+      <label>
+        Parts Price (€)
+        <input type="number" step="0.01" id="partsPrice" />
+      </label>
+
+      <label>
+        Total Price (€)
+        <input type="number" step="0.01" id="price" />
+      </label>
+
+      <label>
+        Date
+        <input type="date" id="date" />
+      </label>
+
+      <label>
+        Status / Category
+        <select id="status">
+          <option value="Pending">Pending</option>
+          <option value="In Progress">In Progress</option>
+          <option value="Ready for Pickup">Ready for Pickup</option>
+          <option value="Completed">Completed</option>
+          <option value="Paid">Paid</option>
+        </select>
+      </label>
+
+      <label class="full-width">
+        Work Needed
+        <textarea id="workNeeded"></textarea>
+      </label>
+
+      <label class="full-width">
+        Notes / Work done
+        <textarea id="notes"></textarea>
+      </label>
+
+      <button type="submit" id="addBtn" class="btn btn-primary">Add / Save</button>
+    </form>
+
+    <!-- CONTROLS -->
+    <div class="actions">
+      <input
+        type="text"
+        id="searchInput"
+        placeholder="Search by client, reg, nixer, status..." />
+
+      <div class="sort-controls">
+        <span class="sort-label">Sort by:</span>
+        <select id="sortBy">
+          <option value="date">Date</option>
+          <option value="client">Client name</option>
+          <option value="price">Total price</option>
+        </select>
+
+        <button
+          type="button"
+          id="sortDirBtn"
+          class="btn btn-small btn-outline"
+          title="Toggle sort direction">
+          ↓ Newest / Highest
+        </button>
+      </div>
+
+      <div class="right-actions">
+        <button id="installBtn" class="btn btn-primary" type="button" style="display:none;">
+          Install App
+        </button>
+
+        <!-- ✅ Hard refresh button -->
+        <button id="hardRefreshBtn" class="btn btn-outline" type="button" title="Force reload latest version">
+          Refresh App
+        </button>
+
+        <button id="themeToggle" type="button" class="btn btn-outline">Dark mode</button>
+        <button id="downloadBtn" class="btn btn-outline" type="button">Download CSV</button>
+        <button id="clearAllBtn" class="btn btn-danger" type="button">Clear ALL records</button>
+      </div>
+    </div>
+
+    <!-- LEGEND -->
+    <div class="legend">
+      <span class="legend-item recent">Recent (≤ 7 days)</span>
+      <span class="legend-item high">High value (€500+)</span>
+      <span class="legend-item old">Very old (≥ 1 year)</span>
+      <span class="legend-item done">Completed / Paid</span>
+    </div>
+
+    <!-- TABLE -->
+    <div class="table-wrapper">
+      <table>
+        <thead>
+          <tr>
+            <th>Client</th>
+            <th>Contact</th>
+            <th>Nixer</th>
+            <th>Reg</th>
+            <th>Status</th>
+            <th>Date</th>
+            <th>Parts (€)</th>
+            <th>Total (€)</th>
+            <th>Profit (€)</th>
+            <th>Notes</th>
+            <th>Work Needed</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody id="recordsBody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- ✅ Update banner -->
+  <div id="updateBanner" class="update-banner" style="display:none;">
+    <div class="update-banner__inner">
+      <div class="update-banner__text">
+        <strong>Update available</strong> — tap refresh to get the latest version.
+      </div>
+      <div class="update-banner__actions">
+        <button id="refreshAppBtn" class="btn btn-primary" type="button">Refresh</button>
+        <button id="dismissUpdateBtn" class="btn btn-outline" type="button">Later</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const STORAGE_KEY = "mixer_records_v1";
+    const THEME_KEY = "mixer_theme_v1";
+
+    const $ = (id) => document.getElementById(id);
+
+    // Form inputs
+    const form = $("mixerForm");
+    const clientNameInput = $("clientName");
+    const contactInput = $("contact");
+    const mixerModelInput = $("mixerModel");
+    const regInput = $("reg");
+    const partsPriceInput = $("partsPrice");
+    const priceInput = $("price");
+    const dateInput = $("date");
+    const statusInput = $("status");
+    const workNeededInput = $("workNeeded");
+    const notesInput = $("notes");
+
+    // UI elements
+    const recordsBody = $("recordsBody");
+    const searchInput = $("searchInput");
+    const clearAllBtn = $("clearAllBtn");
+    const addBtn = $("addBtn");
+    const sortBySelect = $("sortBy");
+    const sortDirBtn = $("sortDirBtn");
+    const themeToggleBtn = $("themeToggle");
+    const downloadBtn = $("downloadBtn");
+    const installBtn = $("installBtn");
+    const hardRefreshBtn = $("hardRefreshBtn");
+
+    // Update banner elements
+    const updateBanner = $("updateBanner");
+    const refreshAppBtn = $("refreshAppBtn");
+    const dismissUpdateBtn = $("dismissUpdateBtn");
+
+    // Dashboard elements
+    const totalJobsEl = $("totalJobs");
+    const totalProfitEl = $("totalProfit");
+    const jobsThisMonthEl = $("jobsThisMonth");
+    const pendingJobsEl = $("pendingJobs");
+
+    // State
+    let records = [];
+    let editIndex = null;
+    let sortBy = "date";
+    let sortDir = "desc";
+    let deferredPrompt = null;
+    let newWorker = null;
+
+    function showUpdateBanner(worker) {
+      newWorker = worker;
+      if (updateBanner) updateBanner.style.display = "block";
+    }
+    function hideUpdateBanner() {
+      if (updateBanner) updateBanner.style.display = "none";
+    }
+
+    // Storage
+    function loadRecords() {
+      try {
+        const saved = localStorage.getItem(STORAGE_KEY);
+        records = saved ? JSON.parse(saved) : [];
+      } catch {
+        records = [];
+      }
+    }
+    function saveRecords() {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(records));
+    }
+    function clearForm() {
+      form.reset();
+      editIndex = null;
+      statusInput.value = "Pending";
+      addBtn.textContent = "Add / Save";
+      addBtn.classList.remove("btn-editing");
+    }
+
+    // Sorting
+    function compareValues(a, b, field) {
+      if (field === "client") {
+        const x = (a.clientName || "").toLowerCase();
+        const y = (b.clientName || "").toLowerCase();
+        if (x < y) return -1;
+        if (x > y) return 1;
+        return 0;
+      }
+      if (field === "price") {
+        return (parseFloat(a.price) || 0) - (parseFloat(b.price) || 0);
+      }
+      const x = a.date ? new Date(a.date).getTime() : 0;
+      const y = b.date ? new Date(b.date).getTime() : 0;
+      return x - y;
+    }
+
+    // Dashboard
+    function renderDashboard() {
+      const now = new Date();
+      const currentMonth = now.getMonth();
+      const currentYear = now.getFullYear();
+
+      let totalProfit = 0;
+      let jobsThisMonth = 0;
+      let pendingJobs = 0;
+
+      records.forEach((r) => {
+        const totalNum = parseFloat(r.price) || 0;
+        const partsNum = parseFloat(r.partsPrice) || 0;
+        totalProfit += (totalNum - partsNum);
+
+        if (r.date) {
+          const d = new Date(r.date);
+          if (!isNaN(d.getTime()) && d.getMonth() === currentMonth && d.getFullYear() === currentYear) {
+            jobsThisMonth++;
+          }
+        }
+
+        const st = r.status || "Pending";
+        if (st === "Pending" || st === "In Progress") pendingJobs++;
+      });
+
+      totalJobsEl.textContent = String(records.length);
+      totalProfitEl.textContent = totalProfit.toFixed(2);
+      jobsThisMonthEl.textContent = String(jobsThisMonth);
+      pendingJobsEl.textContent = String(pendingJobs);
+    }
+
+    // Table
+    function renderTable() {
+      const filter = searchInput.value.trim().toLowerCase();
+      recordsBody.innerHTML = "";
+
+      const now = new Date();
+      const data = records.map((r, index) => ({ ...r, index }));
+
+      data.sort((a, b) => {
+        let result = compareValues(a, b, sortBy);
+        if (sortDir === "desc") result = -result;
+        return result;
+      });
+
+      data
+        .filter((r) => {
+          if (!filter) return true;
+          return (
+            (r.clientName || "").toLowerCase().includes(filter) ||
+            (r.contact || "").toLowerCase().includes(filter) ||
+            (r.mixerModel || "").toLowerCase().includes(filter) ||
+            (r.reg || "").toLowerCase().includes(filter) ||
+            (r.status || "").toLowerCase().includes(filter)
+          );
+        })
+        .forEach((r) => {
+          const tr = document.createElement("tr");
+
+          const totalNum = parseFloat(r.price) || 0;
+          const partsNum = parseFloat(r.partsPrice) || 0;
+          const profitNum = totalNum - partsNum;
+
+          // Row colouring
+          const rowClasses = [];
+          if (r.date) {
+            const d = new Date(r.date);
+            if (!isNaN(d.getTime())) {
+              const diffDays = (now - d) / (1000 * 60 * 60 * 24);
+              if (diffDays <= 7) rowClasses.push("row-recent");
+              else if (diffDays >= 365) rowClasses.push("row-old");
+            }
+          }
+          if (totalNum >= 500) rowClasses.push("row-high-value");
+          const st = r.status || "Pending";
+          if (st === "Completed" || st === "Paid") rowClasses.push("row-completed");
+
+          tr.className = rowClasses.join(" ");
+
+          tr.innerHTML = `
+            <td>${r.clientName || ""}</td>
+            <td>${r.contact || ""}</td>
+            <td>${r.mixerModel || ""}</td>
+            <td>${r.reg || ""}</td>
+            <td>${r.status || ""}</td>
+            <td>${r.date || ""}</td>
+            <td>${r.partsPrice || ""}</td>
+            <td>${r.price || ""}</td>
+            <td>${isNaN(profitNum) ? "" : profitNum.toFixed(2)}</td>
+            <td>${r.notes || ""}</td>
+            <td>${r.workNeeded || ""}</td>
+            <td class="actions-cell">
+              <button class="btn btn-small btn-outline" data-action="edit" data-index="${r.index}">Edit</button>
+              <button class="btn btn-small btn-danger-outline" data-action="delete" data-index="${r.index}">Delete</button>
+            </td>
+          `;
+
+          recordsBody.appendChild(tr);
+        });
+
+      renderDashboard();
+    }
+
+    // Form submit
+    form.addEventListener("submit", (e) => {
+      e.preventDefault();
+
+      const newRecord = {
+        clientName: clientNameInput.value.trim(),
+        contact: contactInput.value.trim(),
+        mixerModel: mixerModelInput.value.trim(),
+        reg: regInput.value.trim(),
+        partsPrice: partsPriceInput.value ? parseFloat(partsPriceInput.value).toFixed(2) : "",
+        price: priceInput.value ? parseFloat(priceInput.value).toFixed(2) : "",
+        date: dateInput.value || "",
+        status: statusInput.value || "Pending",
+        workNeeded: workNeededInput.value.trim(),
+        notes: notesInput.value.trim(),
+      };
+
+      if (!newRecord.clientName) {
+        alert("Client name is required.");
+        return;
+      }
+
+      if (editIndex !== null) records[editIndex] = newRecord;
+      else records.push(newRecord);
+
+      saveRecords();
+      renderTable();
+      clearForm();
+    });
+
+    // Table buttons
+    recordsBody.addEventListener("click", (e) => {
+      const btn = e.target;
+      if (!btn || btn.tagName !== "BUTTON") return;
+
+      const index = parseInt(btn.dataset.index, 10);
+      const action = btn.dataset.action;
+
+      if (action === "delete") {
+        if (confirm("Delete this record?")) {
+          records.splice(index, 1);
+          saveRecords();
+          renderTable();
+        }
+      } else if (action === "edit") {
+        const r = records[index];
+
+        clientNameInput.value = r.clientName || "";
+        contactInput.value = r.contact || "";
+        mixerModelInput.value = r.mixerModel || "";
+        regInput.value = r.reg || "";
+        partsPriceInput.value = r.partsPrice || "";
+        priceInput.value = r.price || "";
+        dateInput.value = r.date || "";
+        statusInput.value = r.status || "Pending";
+        workNeededInput.value = r.workNeeded || "";
+        notesInput.value = r.notes || "";
+
+        editIndex = index;
+        addBtn.textContent = "Save changes";
+        addBtn.classList.add("btn-editing");
+        window.scrollTo({ top: 0, behavior: "smooth" });
+      }
+    });
+
+    // Search
+    searchInput.addEventListener("input", renderTable);
+
+    // Clear all
+    clearAllBtn.addEventListener("click", () => {
+      if (confirm("This will delete ALL records on this device. Continue?")) {
+        records = [];
+        saveRecords();
+        renderTable();
+      }
+    });
+
+    // Sort
+    sortBySelect.addEventListener("change", () => {
+      sortBy = sortBySelect.value;
+      renderTable();
+    });
+
+    sortDirBtn.addEventListener("click", () => {
+      sortDir = sortDir === "asc" ? "desc" : "asc";
+      sortDirBtn.textContent = sortDir === "asc" ? "↑ Oldest / Lowest" : "↓ Newest / Highest";
+      renderTable();
+    });
+
+    // Theme
+    function applyTheme(theme) {
+      if (theme === "dark") {
+        document.body.classList.add("dark-mode");
+        themeToggleBtn.textContent = "Light mode";
+      } else {
+        document.body.classList.remove("dark-mode");
+        themeToggleBtn.textContent = "Dark mode";
+      }
+    }
+
+    applyTheme(localStorage.getItem(THEME_KEY) || "light");
+
+    themeToggleBtn.addEventListener("click", () => {
+      const newTheme = document.body.classList.contains("dark-mode") ? "light" : "dark";
+      localStorage.setItem(THEME_KEY, newTheme);
+      applyTheme(newTheme);
+    });
+
+    // CSV
+    downloadBtn.addEventListener("click", () => {
+      if (!records.length) {
+        alert("No records to download.");
+        return;
+      }
+
+      const rows = [];
+      rows.push([
+        "Client","Contact","Nixer Model","Reg","Status","Date",
+        "Parts Price (€)","Total Price (€)","Profit (€)","Notes","Work Needed"
+      ].join(","));
+
+      records.forEach((r) => {
+        const totalNum = parseFloat(r.price) || 0;
+        const partsNum = parseFloat(r.partsPrice) || 0;
+        const profit = totalNum - partsNum;
+
+        rows.push([
+          r.clientName || "",
+          r.contact || "",
+          r.mixerModel || "",
+          r.reg || "",
+          r.status || "",
+          r.date || "",
+          r.partsPrice || "",
+          r.price || "",
+          profit.toFixed(2),
+          (r.notes || "").replace(/,/g, ";"),
+          (r.workNeeded || "").replace(/,/g, ";")
+        ].join(","));
+      });
+
+      const blob = new Blob([rows.join("\n")], { type: "text/csv" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "nixer-records.csv";
+      a.click();
+      URL.revokeObjectURL(url);
+    });
+
+    // Install (Android/Chrome)
+    window.addEventListener("beforeinstallprompt", (e) => {
+      e.preventDefault();
+      deferredPrompt = e;
+      installBtn.style.display = "inline-flex";
+    });
+
+    installBtn.addEventListener("click", async () => {
+      if (!deferredPrompt) return;
+      deferredPrompt.prompt();
+      await deferredPrompt.userChoice;
+      installBtn.style.display = "none";
+      deferredPrompt = null;
+    });
+
+    // ✅ Hard refresh (best for iPhone caching)
+    hardRefreshBtn.addEventListener("click", async () => {
+      // best effort: tell SW to check for updates
+      try {
+        if ("serviceWorker" in navigator) {
+          const reg = await navigator.serviceWorker.getRegistration();
+          if (reg) await reg.update();
+        }
+      } catch {}
+
+      // best effort: clear caches
+      try {
+        if ("caches" in window) {
+          const keys = await caches.keys();
+          await Promise.all(keys.map((k) => caches.delete(k)));
+        }
+      } catch {}
+
+      // cache-bust URL
+      const url = new URL(window.location.href);
+      url.searchParams.set("t", String(Date.now()));
+      window.location.replace(url.toString());
+    });
+
+    // Init
+    loadRecords();
+    renderTable();
+
+    // Service Worker + Update Banner
+    if ("serviceWorker" in navigator) {
+      window.addEventListener("load", async () => {
+        try {
+          const reg = await navigator.serviceWorker.register("./sw.js?v=v2");
+
+          if (reg.waiting) showUpdateBanner(reg.waiting);
+
+          reg.addEventListener("updatefound", () => {
+            const installing = reg.installing;
+            if (!installing) return;
+
+            installing.addEventListener("statechange", () => {
+              if (installing.state === "installed" && navigator.serviceWorker.controller) {
+                showUpdateBanner(installing);
+              }
+            });
+          });
+
+          let refreshing = false;
+          navigator.serviceWorker.addEventListener("controllerchange", () => {
+            if (refreshing) return;
+            refreshing = true;
+            window.location.reload();
+          });
+
+          refreshAppBtn.addEventListener("click", () => {
+            if (!newWorker) return;
+            newWorker.postMessage({ type: "SKIP_WAITING" });
+            hideUpdateBanner();
+          });
+
+          dismissUpdateBtn.addEventListener("click", hideUpdateBanner);
+
+        } catch (err) {
+          console.error("Service worker registration failed:", err);
+        }
+      });
+    }
+  </script>
+</body>
+</html>
