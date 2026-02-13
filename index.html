@@ -11,6 +11,7 @@
 
   <link rel="stylesheet" href="style.css?v=v2" />
 </head>
+
 <body>
   <h1>Nixer Management</h1>
 
@@ -216,12 +217,17 @@
     // =========================
     // ✅ SUPABASE CONFIG (EDIT ME)
     // =========================
-    const SUPABASE_URL = "PASTE_YOUR_SUPABASE_URL_HERE";
-    const SUPABASE_ANON_KEY = "PASTE_YOUR_PUBLISHABLE_KEY_HERE"; // sb_publishable_...
+    const SUPABASE_URL = "https://GarageManagement.supabase.co";
+    const SUPABASE_ANON_KEY = "sb_publishable_LwTSStYqTNdD8bmFwFDBpQ_h-r07Rdl"; 
 
-    const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    // IMPORTANT: use a unique variable name to avoid "already declared"
+    const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
+    // =========================
+    // APP CONFIG
+    // =========================
     const THEME_KEY = "mixer_theme_v1";
+
     const $ = (id) => document.getElementById(id);
 
     // Auth UI
@@ -271,9 +277,9 @@
     const jobsThisMonthEl = $("jobsThisMonth");
     const pendingJobsEl = $("pendingJobs");
 
-    // App state
-    let records = [];        // rows from Supabase
-    let editId = null;       // record.id when editing
+    // State
+    let records = [];
+    let editId = null;
     let sortBy = "date";
     let sortDir = "desc";
     let deferredPrompt = null;
@@ -293,7 +299,7 @@
     }
 
     async function getSession() {
-      const { data } = await supabase.auth.getSession();
+      const { data } = await supabaseClient.auth.getSession();
       return data.session;
     }
 
@@ -315,12 +321,8 @@
     }
 
     // =========================
-    // ✅ SUPABASE DB (CRUD)
-    // Table: public.records
-    // Columns: client_name, contact, nixer_model, reg, parts_price, total_price, status, job_date, work_needed, notes
-    // user_id is set automatically by default auth.uid()
+    // DB CRUD
     // =========================
-
     function mapFormToDb() {
       const client_name = clientNameInput.value.trim();
       const contact = contactInput.value.trim();
@@ -360,7 +362,7 @@
       const session = await getSession();
       if (!session) return;
 
-      const { data, error } = await supabase
+      const { data, error } = await supabaseClient
         .from("records")
         .select("*")
         .order("created_at", { ascending: false });
@@ -376,7 +378,7 @@
     }
 
     async function insertRecord(dbRow) {
-      const { data, error } = await supabase
+      const { data, error } = await supabaseClient
         .from("records")
         .insert([dbRow])
         .select("*")
@@ -387,7 +389,7 @@
     }
 
     async function updateRecord(id, dbRow) {
-      const { data, error } = await supabase
+      const { data, error } = await supabaseClient
         .from("records")
         .update(dbRow)
         .eq("id", id)
@@ -399,7 +401,7 @@
     }
 
     async function deleteRecord(id) {
-      const { error } = await supabase
+      const { error } = await supabaseClient
         .from("records")
         .delete()
         .eq("id", id);
@@ -408,11 +410,10 @@
     }
 
     async function deleteAllMyRecords() {
-      // IMPORTANT: RLS ensures only your rows are affected
-      const { error } = await supabase
+      const { error } = await supabaseClient
         .from("records")
         .delete()
-        .neq("id", "00000000-0000-0000-0000-000000000000"); // delete all rows you can see
+        .neq("id", "00000000-0000-0000-0000-000000000000");
 
       if (error) throw error;
     }
@@ -420,7 +421,6 @@
     // =========================
     // Sorting + Dashboard + Table
     // =========================
-
     function compareValues(a, b, field) {
       if (field === "client") {
         const x = (a.client_name || "").toLowerCase();
@@ -436,7 +436,6 @@
         return x - y;
       }
 
-      // default: date
       const x = a.job_date ? new Date(a.job_date).getTime() : 0;
       const y = b.job_date ? new Date(b.job_date).getTime() : 0;
       return x - y;
@@ -489,7 +488,6 @@
       data
         .filter((r) => {
           if (!filter) return true;
-
           return (
             (r.client_name || "").toLowerCase().includes(filter) ||
             (r.contact || "").toLowerCase().includes(filter) ||
@@ -515,7 +513,6 @@
             }
           }
           if (totalNum >= 500) rowClasses.push("row-high-value");
-
           const st = r.status || "Pending";
           if (st === "Completed" || st === "Paid") rowClasses.push("row-completed");
 
@@ -538,7 +535,6 @@
               <button class="btn btn-small btn-danger-outline" data-action="delete" data-id="${r.id}">Delete</button>
             </td>
           `;
-
           recordsBody.appendChild(tr);
         });
 
@@ -546,51 +542,47 @@
     }
 
     // =========================
-    // Auth buttons
+    // AUTH
     // =========================
-
-    signupBtn?.addEventListener("click", async () => {
+    signupBtn.addEventListener("click", async () => {
       setAuthMessage("");
       const email = authEmail.value.trim();
       const password = authPassword.value;
-
       if (!email || !password) return setAuthMessage("Enter email + password.", true);
 
-      const { error } = await supabase.auth.signUp({ email, password });
+      const { error } = await supabaseClient.auth.signUp({ email, password });
       if (error) return setAuthMessage(error.message, true);
 
-      setAuthMessage("Signed up! If email confirmation is ON, check your inbox.");
+      setAuthMessage("Signed up! If confirmation is ON, check your email.");
       await refreshSessionUI();
     });
 
-    loginBtn?.addEventListener("click", async () => {
+    loginBtn.addEventListener("click", async () => {
       setAuthMessage("");
       const email = authEmail.value.trim();
       const password = authPassword.value;
-
       if (!email || !password) return setAuthMessage("Enter email + password.", true);
 
-      const { error } = await supabase.auth.signInWithPassword({ email, password });
+      const { error } = await supabaseClient.auth.signInWithPassword({ email, password });
       if (error) return setAuthMessage(error.message, true);
 
       setAuthMessage("Logged in!");
       await refreshSessionUI();
     });
 
-    logoutBtn?.addEventListener("click", async () => {
-      await supabase.auth.signOut();
+    logoutBtn.addEventListener("click", async () => {
+      await supabaseClient.auth.signOut();
       setAuthMessage("Logged out.");
       await refreshSessionUI();
     });
 
-    supabase.auth.onAuthStateChange(() => {
+    supabaseClient.auth.onAuthStateChange(() => {
       refreshSessionUI();
     });
 
     // =========================
-    // Form submit => Supabase insert/update
+    // EVENTS
     // =========================
-
     form.addEventListener("submit", async (e) => {
       e.preventDefault();
 
@@ -601,11 +593,9 @@
       }
 
       try {
-        if (editId) {
-          await updateRecord(editId, dbRow);
-        } else {
-          await insertRecord(dbRow);
-        }
+        if (editId) await updateRecord(editId, dbRow);
+        else await insertRecord(dbRow);
+
         clearForm();
         await fetchRecords();
       } catch (err) {
@@ -620,12 +610,10 @@
 
       const action = btn.dataset.action;
       const id = btn.dataset.id;
-
       if (!id) return;
 
       if (action === "delete") {
         if (!confirm("Delete this record?")) return;
-
         try {
           await deleteRecord(id);
           await fetchRecords();
@@ -657,13 +645,10 @@
       }
     });
 
-    // Search
     searchInput.addEventListener("input", renderTable);
 
-    // Clear all (your rows only)
     clearAllBtn.addEventListener("click", async () => {
       if (!confirm("This will delete ALL your records. Continue?")) return;
-
       try {
         await deleteAllMyRecords();
         await fetchRecords();
@@ -673,7 +658,6 @@
       }
     });
 
-    // Sort
     sortBySelect.addEventListener("change", () => {
       sortBy = sortBySelect.value;
       renderTable();
@@ -704,7 +688,7 @@
       applyTheme(newTheme);
     });
 
-    // CSV download
+    // CSV
     downloadBtn.addEventListener("click", () => {
       if (!records.length) {
         alert("No records to download.");
@@ -761,7 +745,7 @@
       deferredPrompt = null;
     });
 
-    // ✅ Hard refresh
+    // Hard refresh
     hardRefreshBtn.addEventListener("click", async () => {
       try {
         if ("serviceWorker" in navigator) {
@@ -782,63 +766,7 @@
       window.location.replace(url.toString());
     });
 
-    // =========================
-    // Update banner + service worker
-    // =========================
-    function showUpdateBanner(worker) {
-      newWorker = worker;
-      if (updateBanner) updateBanner.style.display = "block";
-    }
-    function hideUpdateBanner() {
-      if (updateBanner) updateBanner.style.display = "none";
-    }
-
-    // Refresh app when new SW takes control
-    let refreshing = false;
-    if ("serviceWorker" in navigator) {
-      navigator.serviceWorker.addEventListener("controllerchange", () => {
-        if (refreshing) return;
-        refreshing = true;
-        window.location.reload();
-      });
-    }
-
-    // Register SW
-    if ("serviceWorker" in navigator) {
-      window.addEventListener("load", async () => {
-        try {
-          const reg = await navigator.serviceWorker.register("./sw.js?v=v2");
-
-          if (reg.waiting) showUpdateBanner(reg.waiting);
-
-          reg.addEventListener("updatefound", () => {
-            const installing = reg.installing;
-            if (!installing) return;
-
-            installing.addEventListener("statechange", () => {
-              if (installing.state === "installed" && navigator.serviceWorker.controller) {
-                showUpdateBanner(installing);
-              }
-            });
-          });
-
-          refreshAppBtn.addEventListener("click", () => {
-            if (!newWorker) return;
-            newWorker.postMessage({ type: "SKIP_WAITING" });
-            hideUpdateBanner();
-          });
-
-          dismissUpdateBtn.addEventListener("click", hideUpdateBanner);
-
-        } catch (err) {
-          console.error("Service worker registration failed:", err);
-        }
-      });
-    }
-
-    // =========================
-    // INIT
-    // =========================
+    // Init
     refreshSessionUI();
   </script>
 </body>
