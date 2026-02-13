@@ -14,7 +14,36 @@
 <body>
   <h1>Nixer Management</h1>
 
-  <div class="container">
+  <!-- ✅ AUTH (Login / Sign up) -->
+  <div class="container" id="authContainer" style="max-width:560px; display:none;">
+    <h2 style="margin-top:0;">Login / Sign up</h2>
+
+    <label style="display:flex; flex-direction:column; gap:6px; margin-bottom:10px;">
+      Email
+      <input type="email" id="authEmail" placeholder="you@email.com" />
+    </label>
+
+    <label style="display:flex; flex-direction:column; gap:6px; margin-bottom:14px;">
+      Password
+      <input type="password" id="authPassword" placeholder="••••••••" />
+    </label>
+
+    <div style="display:flex; gap:10px; flex-wrap:wrap;">
+      <button class="btn btn-primary" id="loginBtn" type="button">Login</button>
+      <button class="btn btn-outline" id="signupBtn" type="button">Sign up</button>
+    </div>
+
+    <p id="authMsg" style="margin-top:12px;"></p>
+  </div>
+
+  <!-- ✅ MAIN APP -->
+  <div class="container" id="appContainer" style="display:none;">
+    <!-- Top bar -->
+    <div style="display:flex; gap:10px; justify-content:flex-end; align-items:center; margin-bottom:10px; flex-wrap:wrap;">
+      <span id="userEmail" style="opacity:.8; font-size:14px;"></span>
+      <button class="btn btn-danger" id="logoutBtn" type="button">Log out</button>
+    </div>
+
     <!-- DASHBOARD SUMMARY -->
     <div class="dashboard">
       <div class="dashboard-card">
@@ -125,7 +154,6 @@
           Install App
         </button>
 
-        <!-- ✅ Hard refresh button -->
         <button id="hardRefreshBtn" class="btn btn-outline" type="button" title="Force reload latest version">
           Refresh App
         </button>
@@ -181,11 +209,31 @@
     </div>
   </div>
 
-  <script>
-    const STORAGE_KEY = "mixer_records_v1";
-    const THEME_KEY = "mixer_theme_v1";
+  <!-- ✅ Supabase -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
+  <script>
+    // =========================
+    // ✅ SUPABASE CONFIG (EDIT ME)
+    // =========================
+    const SUPABASE_URL = "PASTE_YOUR_SUPABASE_URL_HERE";
+    const SUPABASE_ANON_KEY = "PASTE_YOUR_PUBLISHABLE_KEY_HERE"; // sb_publishable_...
+
+    const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+    const THEME_KEY = "mixer_theme_v1";
     const $ = (id) => document.getElementById(id);
+
+    // Auth UI
+    const authContainer = $("authContainer");
+    const appContainer = $("appContainer");
+    const authEmail = $("authEmail");
+    const authPassword = $("authPassword");
+    const loginBtn = $("loginBtn");
+    const signupBtn = $("signupBtn");
+    const logoutBtn = $("logoutBtn");
+    const authMsg = $("authMsg");
+    const userEmailEl = $("userEmail");
 
     // Form inputs
     const form = $("mixerForm");
@@ -217,66 +265,183 @@
     const refreshAppBtn = $("refreshAppBtn");
     const dismissUpdateBtn = $("dismissUpdateBtn");
 
-    // Dashboard elements
+    // Dashboard
     const totalJobsEl = $("totalJobs");
     const totalProfitEl = $("totalProfit");
     const jobsThisMonthEl = $("jobsThisMonth");
     const pendingJobsEl = $("pendingJobs");
 
-    // State
-    let records = [];
-    let editIndex = null;
+    // App state
+    let records = [];        // rows from Supabase
+    let editId = null;       // record.id when editing
     let sortBy = "date";
     let sortDir = "desc";
     let deferredPrompt = null;
+
+    // SW update state
     let newWorker = null;
 
-    function showUpdateBanner(worker) {
-      newWorker = worker;
-      if (updateBanner) updateBanner.style.display = "block";
-    }
-    function hideUpdateBanner() {
-      if (updateBanner) updateBanner.style.display = "none";
+    function setAuthMessage(msg, isError = false) {
+      if (!authMsg) return;
+      authMsg.textContent = msg;
+      authMsg.style.color = isError ? "crimson" : "green";
     }
 
-    // Storage
-    function loadRecords() {
-      try {
-        const saved = localStorage.getItem(STORAGE_KEY);
-        records = saved ? JSON.parse(saved) : [];
-      } catch {
-        records = [];
+    function showApp(isLoggedIn) {
+      if (authContainer) authContainer.style.display = isLoggedIn ? "none" : "block";
+      if (appContainer) appContainer.style.display = isLoggedIn ? "block" : "none";
+    }
+
+    async function getSession() {
+      const { data } = await supabase.auth.getSession();
+      return data.session;
+    }
+
+    async function refreshSessionUI() {
+      const session = await getSession();
+      showApp(!!session);
+
+      if (userEmailEl) {
+        userEmailEl.textContent = session?.user?.email ? `Logged in as ${session.user.email}` : "";
       }
+
+      if (session) {
+        await fetchRecords();
+      } else {
+        records = [];
+        renderTable();
+      }
+      return session;
     }
-    function saveRecords() {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(records));
+
+    // =========================
+    // ✅ SUPABASE DB (CRUD)
+    // Table: public.records
+    // Columns: client_name, contact, nixer_model, reg, parts_price, total_price, status, job_date, work_needed, notes
+    // user_id is set automatically by default auth.uid()
+    // =========================
+
+    function mapFormToDb() {
+      const client_name = clientNameInput.value.trim();
+      const contact = contactInput.value.trim();
+      const nixer_model = mixerModelInput.value.trim();
+      const reg = regInput.value.trim();
+      const parts_price = partsPriceInput.value ? Number(partsPriceInput.value) : null;
+      const total_price = priceInput.value ? Number(priceInput.value) : null;
+      const job_date = dateInput.value || null;
+      const status = statusInput.value || "Pending";
+      const work_needed = workNeededInput.value.trim();
+      const notes = notesInput.value.trim();
+
+      return {
+        client_name,
+        contact,
+        nixer_model,
+        reg,
+        parts_price,
+        total_price,
+        job_date,
+        status,
+        work_needed,
+        notes,
+        updated_at: new Date().toISOString()
+      };
     }
+
     function clearForm() {
       form.reset();
-      editIndex = null;
+      editId = null;
       statusInput.value = "Pending";
       addBtn.textContent = "Add / Save";
       addBtn.classList.remove("btn-editing");
     }
 
-    // Sorting
+    async function fetchRecords() {
+      const session = await getSession();
+      if (!session) return;
+
+      const { data, error } = await supabase
+        .from("records")
+        .select("*")
+        .order("created_at", { ascending: false });
+
+      if (error) {
+        console.error(error);
+        alert("Error loading records: " + error.message);
+        return;
+      }
+
+      records = data || [];
+      renderTable();
+    }
+
+    async function insertRecord(dbRow) {
+      const { data, error } = await supabase
+        .from("records")
+        .insert([dbRow])
+        .select("*")
+        .single();
+
+      if (error) throw error;
+      return data;
+    }
+
+    async function updateRecord(id, dbRow) {
+      const { data, error } = await supabase
+        .from("records")
+        .update(dbRow)
+        .eq("id", id)
+        .select("*")
+        .single();
+
+      if (error) throw error;
+      return data;
+    }
+
+    async function deleteRecord(id) {
+      const { error } = await supabase
+        .from("records")
+        .delete()
+        .eq("id", id);
+
+      if (error) throw error;
+    }
+
+    async function deleteAllMyRecords() {
+      // IMPORTANT: RLS ensures only your rows are affected
+      const { error } = await supabase
+        .from("records")
+        .delete()
+        .neq("id", "00000000-0000-0000-0000-000000000000"); // delete all rows you can see
+
+      if (error) throw error;
+    }
+
+    // =========================
+    // Sorting + Dashboard + Table
+    // =========================
+
     function compareValues(a, b, field) {
       if (field === "client") {
-        const x = (a.clientName || "").toLowerCase();
-        const y = (b.clientName || "").toLowerCase();
+        const x = (a.client_name || "").toLowerCase();
+        const y = (b.client_name || "").toLowerCase();
         if (x < y) return -1;
         if (x > y) return 1;
         return 0;
       }
+
       if (field === "price") {
-        return (parseFloat(a.price) || 0) - (parseFloat(b.price) || 0);
+        const x = Number(a.total_price) || 0;
+        const y = Number(b.total_price) || 0;
+        return x - y;
       }
-      const x = a.date ? new Date(a.date).getTime() : 0;
-      const y = b.date ? new Date(b.date).getTime() : 0;
+
+      // default: date
+      const x = a.job_date ? new Date(a.job_date).getTime() : 0;
+      const y = b.job_date ? new Date(b.job_date).getTime() : 0;
       return x - y;
     }
 
-    // Dashboard
     function renderDashboard() {
       const now = new Date();
       const currentMonth = now.getMonth();
@@ -287,12 +452,12 @@
       let pendingJobs = 0;
 
       records.forEach((r) => {
-        const totalNum = parseFloat(r.price) || 0;
-        const partsNum = parseFloat(r.partsPrice) || 0;
+        const totalNum = Number(r.total_price) || 0;
+        const partsNum = Number(r.parts_price) || 0;
         totalProfit += (totalNum - partsNum);
 
-        if (r.date) {
-          const d = new Date(r.date);
+        if (r.job_date) {
+          const d = new Date(r.job_date);
           if (!isNaN(d.getTime()) && d.getMonth() === currentMonth && d.getFullYear() === currentYear) {
             jobsThisMonth++;
           }
@@ -308,14 +473,13 @@
       pendingJobsEl.textContent = String(pendingJobs);
     }
 
-    // Table
     function renderTable() {
-      const filter = searchInput.value.trim().toLowerCase();
+      const filter = (searchInput.value || "").trim().toLowerCase();
       recordsBody.innerHTML = "";
 
       const now = new Date();
-      const data = records.map((r, index) => ({ ...r, index }));
 
+      const data = [...records];
       data.sort((a, b) => {
         let result = compareValues(a, b, sortBy);
         if (sortDir === "desc") result = -result;
@@ -325,10 +489,11 @@
       data
         .filter((r) => {
           if (!filter) return true;
+
           return (
-            (r.clientName || "").toLowerCase().includes(filter) ||
+            (r.client_name || "").toLowerCase().includes(filter) ||
             (r.contact || "").toLowerCase().includes(filter) ||
-            (r.mixerModel || "").toLowerCase().includes(filter) ||
+            (r.nixer_model || "").toLowerCase().includes(filter) ||
             (r.reg || "").toLowerCase().includes(filter) ||
             (r.status || "").toLowerCase().includes(filter)
           );
@@ -336,14 +501,13 @@
         .forEach((r) => {
           const tr = document.createElement("tr");
 
-          const totalNum = parseFloat(r.price) || 0;
-          const partsNum = parseFloat(r.partsPrice) || 0;
+          const totalNum = Number(r.total_price) || 0;
+          const partsNum = Number(r.parts_price) || 0;
           const profitNum = totalNum - partsNum;
 
-          // Row colouring
           const rowClasses = [];
-          if (r.date) {
-            const d = new Date(r.date);
+          if (r.job_date) {
+            const d = new Date(r.job_date);
             if (!isNaN(d.getTime())) {
               const diffDays = (now - d) / (1000 * 60 * 60 * 24);
               if (diffDays <= 7) rowClasses.push("row-recent");
@@ -351,26 +515,27 @@
             }
           }
           if (totalNum >= 500) rowClasses.push("row-high-value");
+
           const st = r.status || "Pending";
           if (st === "Completed" || st === "Paid") rowClasses.push("row-completed");
 
           tr.className = rowClasses.join(" ");
 
           tr.innerHTML = `
-            <td>${r.clientName || ""}</td>
+            <td>${r.client_name || ""}</td>
             <td>${r.contact || ""}</td>
-            <td>${r.mixerModel || ""}</td>
+            <td>${r.nixer_model || ""}</td>
             <td>${r.reg || ""}</td>
             <td>${r.status || ""}</td>
-            <td>${r.date || ""}</td>
-            <td>${r.partsPrice || ""}</td>
-            <td>${r.price || ""}</td>
+            <td>${r.job_date || ""}</td>
+            <td>${r.parts_price ?? ""}</td>
+            <td>${r.total_price ?? ""}</td>
             <td>${isNaN(profitNum) ? "" : profitNum.toFixed(2)}</td>
             <td>${r.notes || ""}</td>
-            <td>${r.workNeeded || ""}</td>
+            <td>${r.work_needed || ""}</td>
             <td class="actions-cell">
-              <button class="btn btn-small btn-outline" data-action="edit" data-index="${r.index}">Edit</button>
-              <button class="btn btn-small btn-danger-outline" data-action="delete" data-index="${r.index}">Delete</button>
+              <button class="btn btn-small btn-outline" data-action="edit" data-id="${r.id}">Edit</button>
+              <button class="btn btn-small btn-danger-outline" data-action="delete" data-id="${r.id}">Delete</button>
             </td>
           `;
 
@@ -380,65 +545,112 @@
       renderDashboard();
     }
 
-    // Form submit
-    form.addEventListener("submit", (e) => {
+    // =========================
+    // Auth buttons
+    // =========================
+
+    signupBtn?.addEventListener("click", async () => {
+      setAuthMessage("");
+      const email = authEmail.value.trim();
+      const password = authPassword.value;
+
+      if (!email || !password) return setAuthMessage("Enter email + password.", true);
+
+      const { error } = await supabase.auth.signUp({ email, password });
+      if (error) return setAuthMessage(error.message, true);
+
+      setAuthMessage("Signed up! If email confirmation is ON, check your inbox.");
+      await refreshSessionUI();
+    });
+
+    loginBtn?.addEventListener("click", async () => {
+      setAuthMessage("");
+      const email = authEmail.value.trim();
+      const password = authPassword.value;
+
+      if (!email || !password) return setAuthMessage("Enter email + password.", true);
+
+      const { error } = await supabase.auth.signInWithPassword({ email, password });
+      if (error) return setAuthMessage(error.message, true);
+
+      setAuthMessage("Logged in!");
+      await refreshSessionUI();
+    });
+
+    logoutBtn?.addEventListener("click", async () => {
+      await supabase.auth.signOut();
+      setAuthMessage("Logged out.");
+      await refreshSessionUI();
+    });
+
+    supabase.auth.onAuthStateChange(() => {
+      refreshSessionUI();
+    });
+
+    // =========================
+    // Form submit => Supabase insert/update
+    // =========================
+
+    form.addEventListener("submit", async (e) => {
       e.preventDefault();
 
-      const newRecord = {
-        clientName: clientNameInput.value.trim(),
-        contact: contactInput.value.trim(),
-        mixerModel: mixerModelInput.value.trim(),
-        reg: regInput.value.trim(),
-        partsPrice: partsPriceInput.value ? parseFloat(partsPriceInput.value).toFixed(2) : "",
-        price: priceInput.value ? parseFloat(priceInput.value).toFixed(2) : "",
-        date: dateInput.value || "",
-        status: statusInput.value || "Pending",
-        workNeeded: workNeededInput.value.trim(),
-        notes: notesInput.value.trim(),
-      };
-
-      if (!newRecord.clientName) {
+      const dbRow = mapFormToDb();
+      if (!dbRow.client_name) {
         alert("Client name is required.");
         return;
       }
 
-      if (editIndex !== null) records[editIndex] = newRecord;
-      else records.push(newRecord);
-
-      saveRecords();
-      renderTable();
-      clearForm();
+      try {
+        if (editId) {
+          await updateRecord(editId, dbRow);
+        } else {
+          await insertRecord(dbRow);
+        }
+        clearForm();
+        await fetchRecords();
+      } catch (err) {
+        console.error(err);
+        alert("Save failed: " + (err?.message || err));
+      }
     });
 
-    // Table buttons
-    recordsBody.addEventListener("click", (e) => {
+    recordsBody.addEventListener("click", async (e) => {
       const btn = e.target;
       if (!btn || btn.tagName !== "BUTTON") return;
 
-      const index = parseInt(btn.dataset.index, 10);
       const action = btn.dataset.action;
+      const id = btn.dataset.id;
+
+      if (!id) return;
 
       if (action === "delete") {
-        if (confirm("Delete this record?")) {
-          records.splice(index, 1);
-          saveRecords();
-          renderTable();
-        }
-      } else if (action === "edit") {
-        const r = records[index];
+        if (!confirm("Delete this record?")) return;
 
-        clientNameInput.value = r.clientName || "";
+        try {
+          await deleteRecord(id);
+          await fetchRecords();
+        } catch (err) {
+          console.error(err);
+          alert("Delete failed: " + (err?.message || err));
+        }
+      }
+
+      if (action === "edit") {
+        const r = records.find((x) => x.id === id);
+        if (!r) return;
+
+        clientNameInput.value = r.client_name || "";
         contactInput.value = r.contact || "";
-        mixerModelInput.value = r.mixerModel || "";
+        mixerModelInput.value = r.nixer_model || "";
         regInput.value = r.reg || "";
-        partsPriceInput.value = r.partsPrice || "";
-        priceInput.value = r.price || "";
-        dateInput.value = r.date || "";
+        partsPriceInput.value = (r.parts_price ?? "") === null ? "" : String(r.parts_price ?? "");
+        priceInput.value = (r.total_price ?? "") === null ? "" : String(r.total_price ?? "");
+        dateInput.value = r.job_date || "";
         statusInput.value = r.status || "Pending";
-        workNeededInput.value = r.workNeeded || "";
+        workNeededInput.value = r.work_needed || "";
         notesInput.value = r.notes || "";
 
-        editIndex = index;
+        editId = id;
         addBtn.textContent = "Save changes";
         addBtn.classList.add("btn-editing");
         window.scrollTo({ top: 0, behavior: "smooth" });
@@ -448,12 +660,16 @@
     // Search
     searchInput.addEventListener("input", renderTable);
 
-    // Clear all
-    clearAllBtn.addEventListener("click", () => {
-      if (confirm("This will delete ALL records on this device. Continue?")) {
-        records = [];
-        saveRecords();
-        renderTable();
+    // Clear all (your rows only)
+    clearAllBtn.addEventListener("click", async () => {
+      if (!confirm("This will delete ALL your records. Continue?")) return;
+
+      try {
+        await deleteAllMyRecords();
+        await fetchRecords();
+      } catch (err) {
+        console.error(err);
+        alert("Clear failed: " + (err?.message || err));
       }
     });
 
@@ -488,7 +704,7 @@
       applyTheme(newTheme);
     });
 
-    // CSV
+    // CSV download
     downloadBtn.addEventListener("click", () => {
       if (!records.length) {
         alert("No records to download.");
@@ -502,22 +718,22 @@
       ].join(","));
 
       records.forEach((r) => {
-        const totalNum = parseFloat(r.price) || 0;
-        const partsNum = parseFloat(r.partsPrice) || 0;
+        const totalNum = Number(r.total_price) || 0;
+        const partsNum = Number(r.parts_price) || 0;
         const profit = totalNum - partsNum;
 
         rows.push([
-          r.clientName || "",
+          r.client_name || "",
           r.contact || "",
-          r.mixerModel || "",
+          r.nixer_model || "",
           r.reg || "",
           r.status || "",
-          r.date || "",
-          r.partsPrice || "",
-          r.price || "",
+          r.job_date || "",
+          r.parts_price ?? "",
+          r.total_price ?? "",
           profit.toFixed(2),
           (r.notes || "").replace(/,/g, ";"),
-          (r.workNeeded || "").replace(/,/g, ";")
+          (r.work_needed || "").replace(/,/g, ";")
         ].join(","));
       });
 
@@ -545,9 +761,8 @@
       deferredPrompt = null;
     });
 
-    // ✅ Hard refresh (best for iPhone caching)
+    // ✅ Hard refresh
     hardRefreshBtn.addEventListener("click", async () => {
-      // best effort: tell SW to check for updates
       try {
         if ("serviceWorker" in navigator) {
           const reg = await navigator.serviceWorker.getRegistration();
@@ -555,7 +770,6 @@
         }
       } catch {}
 
-      // best effort: clear caches
       try {
         if ("caches" in window) {
           const keys = await caches.keys();
@@ -563,17 +777,33 @@
         }
       } catch {}
 
-      // cache-bust URL
       const url = new URL(window.location.href);
       url.searchParams.set("t", String(Date.now()));
       window.location.replace(url.toString());
     });
 
-    // Init
-    loadRecords();
-    renderTable();
+    // =========================
+    // Update banner + service worker
+    // =========================
+    function showUpdateBanner(worker) {
+      newWorker = worker;
+      if (updateBanner) updateBanner.style.display = "block";
+    }
+    function hideUpdateBanner() {
+      if (updateBanner) updateBanner.style.display = "none";
+    }
 
-    // Service Worker + Update Banner
+    // Refresh app when new SW takes control
+    let refreshing = false;
+    if ("serviceWorker" in navigator) {
+      navigator.serviceWorker.addEventListener("controllerchange", () => {
+        if (refreshing) return;
+        refreshing = true;
+        window.location.reload();
+      });
+    }
+
+    // Register SW
     if ("serviceWorker" in navigator) {
       window.addEventListener("load", async () => {
         try {
@@ -592,13 +822,6 @@
             });
           });
 
-          let refreshing = false;
-          navigator.serviceWorker.addEventListener("controllerchange", () => {
-            if (refreshing) return;
-            refreshing = true;
-            window.location.reload();
-          });
-
           refreshAppBtn.addEventListener("click", () => {
             if (!newWorker) return;
             newWorker.postMessage({ type: "SKIP_WAITING" });
@@ -612,6 +835,11 @@
         }
       });
     }
+
+    // =========================
+    // INIT
+    // =========================
+    refreshSessionUI();
   </script>
 </body>
 </html>
